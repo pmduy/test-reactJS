@@ -25,6 +25,7 @@ const CreateOrder = () => {
     getValues,
     clearErrors,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(customerSchema), // Dùng zod để validate
@@ -38,6 +39,8 @@ const CreateOrder = () => {
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [cashGiven, setCashGiven] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
   const onAddProduct = (productId) => {
     const product = mockProducts.find((p) => p.id === productId);
     const alreadyInCart = cart.find((item) => item.id === productId);
@@ -94,7 +97,8 @@ const CreateOrder = () => {
     reset();
     setCart([]);
     setCashGiven(0);
-    setPaymentMethod('cash');
+    setPaymentMethod('card');
+    setSelectedProduct(null);
     setIsModalVisible(false);
   };
 
@@ -169,19 +173,19 @@ const CreateOrder = () => {
     },
   ];
   const handleInputChange = (e, fieldName) => {
-    const value = e.target.value;
+    const value = e.target.value || '';
+    if (value === '') {
+      setValue(fieldName, '');
+    } else {
+      setValue(fieldName, value);
+    }
 
-    // Cập nhật giá trị của trường tương ứng
-    setValue(fieldName, value);
-
-    // Xóa lỗi khi giá trị đúng
     if (value) {
       clearErrors(fieldName);
     }
   };
 
   const isCartEmpty = cart.length === 0;
-
   return (
     <Card title={<Title level={4}>Tạo đơn hàng</Title>} style={{ maxWidth: 1000, margin: 'auto' }}>
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -189,7 +193,9 @@ const CreateOrder = () => {
           <Form.Item validateStatus={errors.name ? 'error' : ''} help={errors.name?.message}>
             <Input
               placeholder='Tên khách hàng'
-              value={getValues('name')}
+              value={watch('name') || ''}
+              defaultValues={''}
+              type='text'
               onChange={(e) => handleInputChange(e, 'name')}
             />
           </Form.Item>
@@ -197,7 +203,7 @@ const CreateOrder = () => {
           <Form.Item validateStatus={errors.email ? 'error' : ''} help={errors.email?.message}>
             <Input
               placeholder='Email khách hàng'
-              value={getValues('email')}
+              value={watch('email') || ''}
               onChange={(e) => handleInputChange(e, 'email')}
             />
           </Form.Item>
@@ -205,12 +211,20 @@ const CreateOrder = () => {
           <Form.Item validateStatus={errors.phone ? 'error' : ''} help={errors.phone?.message}>
             <Input
               placeholder='Số điện thoại khách hàng'
-              value={getValues('phone')}
+              value={watch('phone') || ''}
               onChange={(e) => handleInputChange(e, 'phone')}
             />
           </Form.Item>
 
-          <Select placeholder='Thêm sản phẩm vào giỏ' onSelect={onAddProduct} style={{ width: '100%' }}>
+          <Select
+            placeholder='Thêm sản phẩm vào giỏ'
+            onSelect={(value) => {
+              setSelectedProduct(value); // Cập nhật giá trị được chọn
+              onAddProduct(value); // Gọi hàm thêm sản phẩm
+            }}
+            value={selectedProduct} // Gắn giá trị từ state
+            style={{ width: '100%' }}
+          >
             {mockProducts.map((product) => (
               <Option key={product.id} value={product.id}>
                 {product.name} - {product.price.toLocaleString()}₫
@@ -236,15 +250,19 @@ const CreateOrder = () => {
                   onChange={setCashGiven}
                   value={cashGiven || ''}
                   style={{ width: 200 }}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
-                  parser={(value) => value.replace(/\$\s?|(,*)/g, '')} 
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
                 />
                 {change > 0 && <Text style={{ marginLeft: 16 }}>Tiền thừa trả khách: {change.toLocaleString()}₫</Text>}
               </div>
             )}
           </Card>
 
-          <Button type='primary' htmlType='submit' disabled={isCartEmpty}>
+          <Button
+            type='primary'
+            htmlType='submit'
+            disabled={isCartEmpty || (paymentMethod === 'cash' && (cashGiven === null || cashGiven < totalAmount))}
+          >
             Thanh toán
           </Button>
         </Space>
